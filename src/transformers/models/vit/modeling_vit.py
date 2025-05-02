@@ -799,6 +799,8 @@ class ViTForImageClassification(ViTPreTrainedModel):
         # Classifier head
         self.classifier = nn.Linear(config.hidden_size, config.num_labels) if config.num_labels > 0 else nn.Identity()
 
+        self.loss_fct: torch.nn.Module|None = None
+
         # Initialize weights and apply final processing
         self.post_init()
 
@@ -853,17 +855,20 @@ class ViTForImageClassification(ViTPreTrainedModel):
                     self.config.problem_type = "multi_label_classification"
 
             if self.config.problem_type == "regression":
-                loss_fct = MSELoss()
+                if self.loss_fct is None:
+                    self.loss_fct = MSELoss()
                 if self.num_labels == 1:
-                    loss = loss_fct(logits.squeeze(), labels.squeeze())
+                    loss = self.loss_fct(logits.squeeze(), labels.squeeze())
                 else:
-                    loss = loss_fct(logits, labels)
+                    loss = self.loss_fct(logits, labels)
             elif self.config.problem_type == "single_label_classification":
-                loss_fct = CrossEntropyLoss()
-                loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
+                if self.loss_fct is None:
+                    self.loss_fct = CrossEntropyLoss()
+                loss = self.loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
             elif self.config.problem_type == "multi_label_classification":
-                loss_fct = BCEWithLogitsLoss()
-                loss = loss_fct(logits, labels)
+                if self.loss_fct is None:
+                    self.loss_fct = BCEWithLogitsLoss()
+                loss = self.loss_fct(logits, labels)
 
         if not return_dict:
             output = (logits,) + outputs[1:]
